@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HydroMetric — Pemantau Kualitas Air</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: rgba(255,255,255,0.07);
+    --accent: #00d4ff;
+    --accent2: #00ff9d;
+    --accent3: #ff6b6b;
+    --accent4: #ffd166;
+    --text: #e8f0fe;
+    --muted: #6b7fa3;
+    --safe: #00ff9d;
+    --warning: #ffd166;
+    --danger: #ff6b6b;
+    --font: 'Sora', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glow blobs */
+  .blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.12;
+    pointer-events: none;
+    z-index: 0;
+    animation: blobFloat 8s ease-in-out infinite;
+  }
+  .blob-1 { width: 400px; height: 400px; background: var(--accent); top: -100px; left: -100px; animation-delay: 0s; }
+  .blob-2 { width: 300px; height: 300px; background: var(--accent2); bottom: 100px; right: -50px; animation-delay: 3s; }
+  .blob-3 { width: 200px; height: 200px; background: var(--accent4); top: 50%; left: 30%; animation-delay: 5s; }
+
+  @keyframes blobFloat {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-20px) scale(1.05); }
+  }
+
+  /* LAYOUT */
+  .wrapper { 
+    position: relative; 
+    z-index: 1; 
+    display: flex; 
+    flex-direction: column; 
+    min-height: 100vh; 
+    max-width: 1100px; 
+    margin: 0 auto;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    background: rgba(11, 15, 26, 0.2);
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(11,15,26,0.8);
+    backdrop-filter: blur(20px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-sub { font-size: 11px; font-weight: 400; color: var(--muted); display: block; }
+
+  .header-center {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--muted);
+    width: 340px;
+  }
+
+  .header-center input {
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    width: 100%;
+  }
+
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--mono);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .status-online { background: rgba(0,255,157,0.1); color: var(--safe); border: 1px solid rgba(0,255,157,0.2); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1.5s ease-in-out infinite; }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .icon-btn {
+    width: 36px; height: 36px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 16px;
+    transition: all 0.2s;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .avatar {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    color: #000;
+  }
+
+  /* SIDEBAR */
+  .layout { display: flex; flex: 1; }
+
+  .sidebar {
+    width: 220px;
+    border-right: 1px solid var(--border);
+    background: rgba(17,24,39,0.6);
+    backdrop-filter: blur(10px);
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: sticky;
+    top: 69px;
+    height: calc(100vh - 69px);
+    overflow-y: auto;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+    border: 1px solid transparent;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active {
+    background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(0,255,157,0.08));
+    color: var(--accent);
+    border-color: rgba(0,212,255,0.2);
+  }
+
+  .nav-bottom { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+
+  /* MAIN */
+  .main {
+    flex: 1;
+    padding: 28px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+    max-height: calc(100vh - 69px);
+  }
+
+  /* PAGE TITLE */
+  .page-title { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .page-title span { color: var(--text); font-weight: 600; }
+
+  /* HERO GRID */
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 20px;
+  }
+
+  /* LIVE READING CARD */
+  .live-card {
+    background: linear-gradient(135deg, var(--surface), var(--surface2));
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .live-card::after {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(0,212,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .live-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted);
+    font-family: var(--mono);
+    margin-bottom: 16px;
+  }
+
+  .live-value-row { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 16px; }
+
+  .live-value {
+    font-size: 72px;
+    font-weight: 700;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-family: var(--mono);
+    animation: countUp 1s ease-out;
+  }
+
+  @keyframes countUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .live-unit { font-size: 22px; color: var(--muted); margin-bottom: 12px; }
+
+  .wave-icon { position: absolute; right: 28px; top: 28px; opacity: 0.15; }
+
+  .quality-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: var(--mono);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .q-safe { background: rgba(0,255,157,0.12); color: var(--safe); border: 1px solid rgba(0,255,157,0.25); }
+  .q-warning { background: rgba(255,209,102,0.12); color: var(--warning); border: 1px solid rgba(255,209,102,0.25); }
+  .q-danger { background: rgba(255,107,107,0.12); color: var(--danger); border: 1px solid rgba(255,107,107,0.25); }
+
+  .live-meta { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+
+  .live-actions { display: flex; gap: 10px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+  }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), #0099bb); color: #000; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,212,255,0.3); }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* STATS COLUMN */
+  .stats-col { display: flex; flex-direction: column; gap: 14px; }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: all 0.2s;
+  }
+  .stat-card:hover { border-color: rgba(255,255,255,0.12); transform: translateX(2px); }
+
+  .stat-icon {
+    width: 42px; height: 42px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .si-blue { background: rgba(0,212,255,0.1); }
+  .si-red { background: rgba(255,107,107,0.1); }
+  .si-green { background: rgba(0,255,157,0.1); }
+
+  .stat-info { flex: 1; }
+  .stat-label { font-size: 11px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+  .stat-value { font-size: 20px; font-weight: 700; font-family: var(--mono); }
+  .sv-blue { color: var(--accent); }
+  .sv-red { color: var(--danger); }
+  .sv-green { color: var(--safe); }
+  .sv-yellow { color: var(--warning); }
+
+  /* CHART SECTION */
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+  }
+
+  .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+  .card-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .card-sub { font-size: 12px; color: var(--muted); }
+
+  .tab-group { display: flex; gap: 4px; background: var(--surface2); border-radius: 10px; padding: 4px; }
+  .tab {
+    padding: 6px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--mono);
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+    border: none;
+    background: none;
+  }
+  .tab.active { background: var(--surface); color: var(--accent); }
+
+  .chart-wrap { position: relative; height: 200px; }
+
+  canvas { width: 100% !important; }
+
+  /* THRESHOLD ZONES */
+  .threshold-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 12px;
+    margin-bottom: 6px;
+  }
+  .tz-safe { flex: 3; background: linear-gradient(90deg, var(--safe), #00cc7d); }
+  .tz-warn { flex: 2; background: linear-gradient(90deg, var(--warning), #cc9900); }
+  .tz-danger { flex: 1; background: linear-gradient(90deg, var(--danger), #cc0000); }
+
+  .threshold-labels { display: flex; justify-content: space-between; font-size: 10px; font-family: var(--mono); color: var(--muted); }
+
+  /* BOTTOM GRID */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 20px;
+  }
+
+  /* STATUS2 COLUMN */
+  .status2-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .status2-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-align: center;
+    flex: 1;
+    transition: border-color 0.3s;
+  }
+
+  .status2-icon { font-size: 28px; line-height: 1; }
+
+  .status2-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--muted);
+  }
+
+  .status2-value {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: var(--mono);
+    letter-spacing: 1px;
+  }
+
+  /* LOG AKTIVITAS */
+  .log-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .log-header {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 18px;
+    color: var(--text);
+  }
+
+  .log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .log-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  .log-item.log-safe   { background: rgba(0,255,157,0.05); border-color: rgba(0,255,157,0.15); }
+  .log-item.log-danger { background: rgba(255,107,107,0.05); border-color: rgba(255,107,107,0.15); }
+
+  .log-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .log-safe   .log-icon { background: rgba(0,255,157,0.15); color: var(--safe); }
+  .log-danger .log-icon { background: rgba(255,107,107,0.15); color: var(--danger); }
+
+  .log-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .log-meta {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+  }
+
+  /* MAP CARD */
+  .map-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+    grid-column: span 1;
+  }
+
+  .map-placeholder {
+    background: linear-gradient(135deg, #0d1b2a, #1a2d3d);
+    border-radius: 12px;
+    height: 160px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 14px;
+    border: 1px solid rgba(0,212,255,0.1);
+  }
+
+  .map-grid-lines {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.08) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .map-pin {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .pin-dot {
+    width: 14px; height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    border: 3px solid rgba(0,212,255,0.3);
+    animation: pingAnim 2s ease-in-out infinite;
+    position: relative;
+  }
+
+  .pin-dot::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2px solid rgba(0,212,255,0.2);
+    animation: pingRing 2s ease-in-out infinite;
+  }
+
+  @keyframes pingAnim { 0%, 100% { box-shadow: 0 0 0 0 rgba(0,212,255,0.4); } 50% { box-shadow: 0 0 0 10px rgba(0,212,255,0); } }
+  @keyframes pingRing { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
+
+  .pin-label {
+    background: rgba(0,212,255,0.9);
+    color: #000;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--mono);
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-top: 6px;
+    white-space: nowrap;
+  }
+
+  .map-rivers {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  .map-rivers::before {
+    content: '';
+    position: absolute;
+    top: 30%; left: 0;
+    width: 100%;
+    height: 30px;
+    background: rgba(0,100,200,0.15);
+    border-radius: 40px;
+    transform: rotate(-8deg);
+  }
+
+  .map-rivers::after {
+    content: '';
+    position: absolute;
+    top: 55%; left: 20%;
+    width: 60%;
+    height: 20px;
+    background: rgba(0,150,200,0.12);
+    border-radius: 40px;
+    transform: rotate(5deg);
+  }
+
+  .map-info { display: flex; flex-direction: column; gap: 8px; }
+  .map-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+  .map-key { color: var(--muted); }
+  .map-val { font-family: var(--mono); font-weight: 500; }
+  .map-val.accent { color: var(--accent); }
+  .map-val.safe { color: var(--safe); }
+
+  /* ACTIVITY LOG */
+  .activity-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+  }
+
+  .activity-list { display: flex; flex-direction: column; gap: 4px; }
+
+  .activity-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    transition: background 0.2s;
+    border-radius: 6px;
+    padding-left: 8px;
+  }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-item:hover { background: rgba(255,255,255,0.02); }
+
+  .activity-name { font-weight: 500; }
+  .activity-badge {
+    font-size: 10px; font-weight: 700; font-family: var(--mono);
+    padding: 3px 8px; border-radius: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .ab-success { background: rgba(0,255,157,0.1); color: var(--safe); }
+  .ab-triggered { background: rgba(255,107,107,0.1); color: var(--danger); }
+  .ab-manual { background: rgba(255,209,102,0.1); color: var(--warning); }
+  .ab-safe { background: rgba(0,212,255,0.1); color: var(--accent); }
+
+  .activity-val { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .activity-time { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .view-all {
+    text-align: center;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+    margin-top: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    display: block;
+    font-family: var(--mono);
+    letter-spacing: 0.5px;
+  }
+
+  /* SENSOR PARAMS */
+  .params-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+  }
+
+  .param-grid { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+
+  .param-item { }
+  .param-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .param-name { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .param-val { font-size: 13px; font-weight: 600; font-family: var(--mono); }
+
+  .param-bar { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .param-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 16px 32px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  footer a { color: var(--muted); text-decoration: underline; }
+  footer a:hover { color: var(--accent); }
+
+  /* ALERT TOAST */
+  .alert-toast {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    background: rgba(255,107,107,0.1);
+    border: 1px solid rgba(255,107,107,0.3);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 200;
+    animation: slideIn 0.3s ease;
+    max-width: 280px;
+  }
+  .toast-hidden { display: none; }
+
+  @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+  /* NOTIFICATION PANEL */
+  .notif-panel {
+    position: absolute;
+    top: 50px;
+    right: 0;
+    width: 280px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 12px;
+    z-index: 300;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    transform-origin: top right;
+  }
+  .notif-panel.show { display: flex; animation: notifIn 0.2s ease; }
+  @keyframes notifIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  
+  .notif-header { font-size: 13px; font-weight: 600; padding-bottom: 8px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .notif-list-drop { display: flex; flex-direction: column; gap: 6px; max-height: 250px; overflow-y: auto; margin-top: 4px; }
+  .notif-item { font-size: 12px; padding: 10px; border-radius: 10px; background: rgba(255,255,255,0.02); line-height: 1.4; border-left: 3px solid transparent; text-align: left; }
+  .notif-item.danger { border-left-color: var(--danger); background: rgba(255,107,107,0.05); }
+  .notif-item.warning { border-left-color: var(--warning); background: rgba(255,209,102,0.05); }
+  .notif-item.safe { border-left-color: var(--safe); background: rgba(0,255,157,0.05); }
+  .notif-empty { font-size: 11px; color: var(--muted); text-align: center; padding: 12px 0; }
+  
+  .notif-badge { position: absolute; top: 6px; right: 8px; width: 8px; height: 8px; background: var(--danger); border-radius: 50%; box-shadow: 0 0 5px var(--danger); display: none; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* CALIBRATION MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    width: 420px;
+    transform: translateY(10px);
+    transition: transform 0.2s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+  .modal-progress { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin: 16px 0; }
+  .modal-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0; transition: width 0.1s linear; }
+
+  .modal-step { font-size: 13px; color: var(--muted); font-family: var(--mono); text-align: center; }
+
+  /* Responsive tweaks */
+  @media (max-width: 900px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .bottom-grid { grid-template-columns: 1fr; }
+    .status2-col { flex-direction: row; }
+    .sidebar { display: none; }
+    .header-center { display: none; }
+  }
+  
+  @media (max-width: 600px) {
+    .main { padding: 16px; gap: 16px; }
+    header { padding: 16px; }
+    .live-card, .stat-card, .chart-card, .map-card, .activity-card, .params-card { padding: 16px; border-radius: 16px; }
+    .live-value { font-size: 56px; }
+    .hero-grid, .bottom-grid { gap: 16px; }
+    .wrapper { border-left: none; border-right: none; background: transparent; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Blobs -->
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+
+<!-- Alert Toast -->
+<div class="alert-toast toast-hidden" id="alertToast">
+  <span>⚠️</span>
+  <div>
+    <div style="font-weight:600;color:var(--danger)">TDS Alert</div>
+    <div style="color:var(--muted);font-size:11px">Nilai melebihi ambang batas aman</div>
+  </div>
+  <span style="cursor:pointer;color:var(--muted)" onclick="document.getElementById('alertToast').classList.add('toast-hidden')">✕</span>
+</div>
+
+<!-- Calibration Modal -->
+<div class="modal-overlay" id="calModal">
+  <div class="modal">
+    <div class="modal-title">⚙️ Kalibrasi Paksa</div>
+    <div class="modal-sub">Sistem akan melakukan kalibrasi ulang sensor TDS. Proses membutuhkan ±30 detik.</div>
+    <div class="modal-progress"><div class="modal-bar" id="calBar"></div></div>
+    <div class="modal-step" id="calStep">Menunggu konfirmasi...</div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" id="calBtn" onclick="startCalibration()">Mulai Kalibrasi</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrapper">
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">💧</div>
+      <div>
+        HydroMetric
+        <span class="logo-sub">Pemantauan Presisi</span>
+      </div>
+    </div>
+    <div class="header-right" style="position:relative;">
+      <div class="status-pill" id="statusPill" style="background:rgba(107,127,163,0.1);color:#6b7fa3;border:1px solid rgba(107,127,163,0.2);"><div class="status-dot" style="background:#6b7fa3"></div>Sensor: Menunggu</div>
+      <div class="icon-btn" onclick="toggleNotifPanel()" style="position:relative;">
+        🔔
+        <span class="notif-badge" id="notifBadge"></span>
+      </div>
+      
+      <!-- Notification Dropdown -->
+      <div class="notif-panel" id="notifPanel">
+        <div class="notif-header">
+          <span>Notifikasi Terkini</span>
+          <span style="font-size:10px;color:var(--accent);cursor:pointer;" onclick="toggleNotifPanel()">Tutup</span>
+        </div>
+        <div class="notif-list-drop" id="notifListDrop">
+          <div class="notif-empty" id="notifEmpty">Belum ada notifikasi baru</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+<div class="layout center">
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <!-- Breadcrumb -->
+      <div class="page-title">
+        Dasbor / <span>Monitor Langsung</span>
+        <span style="margin-left:auto;font-family:var(--mono);font-size:11px" id="clockDisplay"></span>
+      </div>
+
+      <!-- HERO GRID -->
+      <div class="hero-grid">
+        <!-- Live Reading Card -->
+        <div class="live-card">
+          <svg class="wave-icon" width="120" height="80" viewBox="0 0 120 80" fill="none">
+            <path d="M0 40 Q15 20 30 40 Q45 60 60 40 Q75 20 90 40 Q105 60 120 40" stroke="white" stroke-width="3" fill="none"/>
+            <path d="M0 55 Q15 35 30 55 Q45 75 60 55 Q75 35 90 55 Q105 75 120 55" stroke="white" stroke-width="2" fill="none" opacity="0.5"/>
+          </svg>
+
+          <div class="live-label">
+            <div class="status-dot" style="background:var(--safe)"></div>
+            Pembacaan Sensor Langsung — TDS
+          </div>
+
+          <div class="live-value-row">
+            <div class="live-value" id="liveVal">--</div>
+            <div class="live-unit">ppm</div>
+          </div>
+
+          <div id="qualityBadge" class="quality-badge" style="background:rgba(107,127,163,0.12);color:#6b7fa3;border:1px solid rgba(107,127,163,0.25)">⏳ Menunggu Sensor</div>
+          <div class="live-meta" id="lastUpdated">Sensor belum mengirim data</div>
+
+          <div class="live-actions">
+            <button class="btn btn-primary" onclick="document.getElementById('calModal').classList.add('open')">↺ Kalibrasi Paksa</button>
+            <button class="btn btn-outline" onclick="exportReport()" id="exportBtn">↓ Ekspor PDF</button>
+          </div>
+        </div>
+
+        <!-- Stats Column -->
+        <div class="stats-col">
+          <div class="stat-card">
+            <div class="stat-icon si-blue"><span style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--accent)">Σ</span></div>
+            <div class="stat-info">
+              <div class="stat-label">Rata-rata TDS (24J)</div>
+              <div class="stat-value sv-blue" id="statAvgVal">— <span style="font-size:13px;font-weight:400">ppm</span></div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon si-red"><span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--danger)">↑</span></div>
+            <div class="stat-info">
+              <div class="stat-label">Pembacaan Maks (24J)</div>
+              <div class="stat-value sv-red" id="statMaxVal">— <span style="font-size:13px;font-weight:400">ppm</span></div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon si-green"><span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--safe)">↓</span></div>
+            <div class="stat-info">
+              <div class="stat-label">Pembacaan Min (24J)</div>
+              <div class="stat-value sv-green" id="statMinVal">— <span style="font-size:13px;font-weight:400">ppm</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+          <!-- TDS TREND CHART -->
+      <div class="chart-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Tren TDS</div>
+            <div class="card-sub">Analisis fluktuasi kualitas air 24 jam</div>
+          </div>
+          <div class="tab-group">
+            <button class="tab active" onclick="switchTab(this,'24H')">24H</button>
+            <button class="tab" onclick="switchTab(this,'7D')">7D</button>
+            <button class="tab" onclick="switchTab(this,'30D')">30D</button>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="tdsChart"></canvas>
+        </div>
+        <div class="threshold-bar">
+          <div class="tz-safe"></div>
+          <div class="tz-warn"></div>
+          <div class="tz-danger"></div>
+        </div>
+        <div class="threshold-labels">
+          <span>0 ppm — Aman (&lt;300)</span>
+          <span>Sedang (300–500)</span>
+          <span>Berbahaya (&gt;500)</span>
+        </div>
+      </div>
+
+
+      <!-- BOTTOM GRID -->
+      <div class="bottom-grid">
+
+        <!-- STATUS AIR + SENSOR -->
+        <div class="status2-col">
+          <div class="status2-card" id="cardStatusAir">
+            <div class="status2-icon">&#x1F4A7;</div>
+            <div class="status2-label">STATUS AIR</div>
+            <div class="status2-value sv-muted" id="status2AirVal" style="color:var(--muted)">--</div>
+          </div>
+          <div class="status2-card">
+            <div class="status2-icon">&#x1F4E1;</div>
+            <div class="status2-label">SENSOR</div>
+            <div class="status2-value sv-red" id="status2SensorVal">OFFLINE</div>
+          </div>
+        </div>
+
+        <!-- LOG AKTIVITAS -->
+        <div class="log-card">
+          <div class="log-header">Log Aktivitas</div>
+          <div class="log-list" id="logList">
+            <div class="log-item" id="logEmptyState" style="justify-content:center;color:var(--muted);font-size:12px;padding:20px;opacity:0.7;">
+              ⏳ Menunggu data dari sensor...
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end bottom-grid -->
+    </main>
+  </div>
+
+  <footer>
+    <span>© 2024 HydroMetric Monitoring Systems. v2.4.0-clinical</span>
+    <span>
+      <a href="#">Kebijakan Privasi</a> &nbsp;·&nbsp;
+      <a href="#">Syarat Layanan</a> &nbsp;·&nbsp;
+      <a href="#">Status Sistem</a>
+    </span>
+  </footer>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+let currentTDS = 0;
+let uptimeSeconds = 0;
+let alertShown = false;
+let sensorActive = false; // true setelah ada data real dari sensor
+
+// ─────────────────────────────────────────────
+//  CHART INITIALIZATION
+// ─────────────────────────────────────────────
+const ctx = document.getElementById('tdsChart').getContext('2d');
+const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+gradient.addColorStop(0, 'rgba(0,212,255,0.25)');
+gradient.addColorStop(1, 'rgba(0,212,255,0)');
+
+const tdsChart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label: 'TDS (ppm)',
+      data: [],
+      borderColor: '#00d4ff',
+      backgroundColor: gradient,
+      borderWidth: 2.5,
+      pointRadius: 0,
+      pointHoverRadius: 6,
+      pointHoverBackgroundColor: '#00d4ff',
+      pointHoverBorderColor: '#fff',
+      pointHoverBorderWidth: 2,
+      fill: true,
+      tension: 0.45,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: 'rgba(17,24,39,0.95)',
+        borderColor: 'rgba(0,212,255,0.3)',
+        borderWidth: 1,
+        titleColor: '#6b7fa3',
+        bodyColor: '#00d4ff',
+        bodyFont: { family: 'JetBrains Mono', size: 14, weight: 'bold' },
+        padding: 12,
+        callbacks: {
+          label: ctx => ` ${ctx.raw} ppm`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          color: 'rgba(255,255,255,0.04)',
+          drawBorder: false
+        },
+        ticks: {
+          color: '#6b7fa3',
+          font: {
+            family: 'JetBrains Mono',
+            size: 11
+          },
+          maxTicksLimit: 6
+        }
+      },
+      y: {
+        min: 0,
+        max: 500,
+        ticks: {
+          stepSize: 50,
+          color: '#00d4ff',
+          font: {
+            family: 'JetBrains Mono',
+            size: 11,
+            weight: 'bold'
+          },
+          callback: function(value) {
+            return value + ' ppm';
+          }
+        },
+        grid: {
+          color: 'rgba(255,255,255,0.06)',
+          drawBorder: true
+        },
+        border: {
+          display: true,
+          color: 'rgba(255,255,255,0.15)'
+        }
+      }
+    }
+  }
+});
+
+// Tab switching
+let currentTab = '24H';
+function switchTab(el, tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentTab = tab;
+  fetchHistory();
+}
+
+// Demo data fallback for chart
+function loadDemoChartData() {
+  const now = new Date();
+  const labels = [];
+  const values = [];
+  const count = 24;
+  for (let i = count; i >= 0; i--) {
+    const t = new Date(now - i * 3600000);
+    labels.push(t.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}));
+    const base = 110 + Math.sin(i * 0.4) * 20 + Math.random() * 15;
+    values.push(Math.round(base));
+  }
+  tdsChart.data.labels = labels;
+  tdsChart.data.datasets[0].data = values;
+  tdsChart.update();
+
+  if (values.length > 0) {
+    const avg = Math.round(values.reduce((a,b) => a+b, 0) / values.length);
+    const max = Math.round(Math.max(...values));
+    const min = Math.round(Math.min(...values));
+    const avgEl = document.getElementById('statAvgVal');
+    const maxEl = document.getElementById('statMaxVal');
+    const minEl = document.getElementById('statMinVal');
+    if (avgEl) avgEl.innerHTML = `${avg} <span style="font-size:13px;font-weight:400">ppm</span>`;
+    if (maxEl) maxEl.innerHTML = `${max} <span style="font-size:13px;font-weight:400">ppm</span>`;
+    if (minEl) minEl.innerHTML = `${min} <span style="font-size:13px;font-weight:400">ppm</span>`;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  DATABASE FETCHING & LOGIC
+// ─────────────────────────────────────────────
+let secondsSinceUpdate = 0;
+
+function updateQuality(tds) {
+  const badge = document.getElementById('qualityBadge');
+
+  if (tds <= 150) {
+    badge.className = 'quality-badge q-safe';
+    badge.textContent = '✓ Layak Konsumsi';
+    setStatus2('LAYAK', 'sv-green', false);
+  } else if (tds < 300) {
+    badge.className = 'quality-badge q-warning';
+    badge.textContent = '⚠ Perlu Perhatian';
+    setStatus2('PERHATIAN', 'sv-yellow', false);
+  } else {
+    badge.className = 'quality-badge q-danger';
+    badge.textContent = '✕ Tidak Layak';
+    setStatus2('TIDAK LAYAK', 'sv-red', true);
+    if (!alertShown) {
+      alertShown = true;
+      document.getElementById('alertToast').classList.remove('toast-hidden');
+      setTimeout(() => document.getElementById('alertToast').classList.add('toast-hidden'), 5000);
+      if (typeof addNotification === 'function') {
+        addNotification('⚠️ TDS Kritis', `Nilai TDS mencapai ${Math.round(tds)} ppm! Segera lakukan pengecekan.`, 'danger');
+      }
+    }
+  }
+
+  if (tds < 300) alertShown = false;
+}
+
+function updateLastUpdated(sec) {
+  const el = document.getElementById('lastUpdated');
+  if (sec < 60) el.textContent = `Terakhir diperbarui: ${sec} detik yang lalu`;
+  else el.textContent = `Terakhir diperbarui: ${Math.floor(sec/60)} menit yang lalu`;
+}
+
+async function fetchHistory() {
+  try {
+    const res = await fetch('/api/get_history');
+    const data = await res.json();
+    const labels = data.map(d => d.label);
+    const values = data.map(d => parseFloat(d.tds));
+    
+    if (values.length === 0) {
+      // Sensor belum aktif — tampilkan chart kosong, bukan demo data
+      tdsChart.data.labels = ['--'];
+      tdsChart.data.datasets[0].data = [null];
+      tdsChart.update();
+      const avgEl = document.getElementById('statAvgVal');
+      const maxEl = document.getElementById('statMaxVal');
+      const minEl = document.getElementById('statMinVal');
+      if (avgEl) avgEl.innerHTML = `-- <span style="font-size:13px;font-weight:400">ppm</span>`;
+      if (maxEl) maxEl.innerHTML = `-- <span style="font-size:13px;font-weight:400">ppm</span>`;
+      if (minEl) minEl.innerHTML = `-- <span style="font-size:13px;font-weight:400">ppm</span>`;
+      return;
+    }
+
+    tdsChart.data.labels = labels;
+    tdsChart.data.datasets[0].data = values;
+    tdsChart.update();
+    
+    const avg = Math.round(values.reduce((a,b) => a+b, 0) / values.length);
+    const max = Math.round(Math.max(...values));
+    const min = Math.round(Math.min(...values));
+    const avgEl = document.getElementById('statAvgVal');
+    const maxEl = document.getElementById('statMaxVal');
+    const minEl = document.getElementById('statMinVal');
+    if (avgEl) avgEl.innerHTML = `${avg} <span style="font-size:13px;font-weight:400">ppm</span>`;
+    if (maxEl) maxEl.innerHTML = `${max} <span style="font-size:13px;font-weight:400">ppm</span>`;
+    if (minEl) minEl.innerHTML = `${min} <span style="font-size:13px;font-weight:400">ppm</span>`;
+  } catch(e) { 
+    console.error(e);
+  }
+}
+
+async function fetchLiveData() {
+  try {
+    const res = await fetch('/api/getdata');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    // Cek apakah sensor sudah mengirim data nyata
+    // API mengembalikan tds:0 dan status:'Belum Ada Data' jika collection kosong
+    const noData = (data.status === 'Belum Ada Data' || data.tds === 0 && !sensorActive);
+
+    if (noData && !sensorActive) {
+      setSensorOffline();
+      return;
+    }
+
+    // Sensor aktif — ada data nyata
+    sensorActive = true;
+    setSensorOnline();
+
+    currentTDS = parseFloat(data.tds) || 0;
+    document.getElementById('liveVal').textContent = Math.round(currentTDS);
+    updateQuality(currentTDS);
+
+    const now2 = new Date();
+    const timeStr2 = now2.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    const isGoodLog = currentTDS <= 150;
+    const logTitle = currentTDS <= 150 ? 'Air Layak' : (currentTDS < 300 ? 'Air Perlu Perhatian' : 'Air Tidak Layak');
+    appendLog(logTitle, Math.round(currentTDS), timeStr2, isGoodLog);
+
+    if (data.created_at) {
+      const lastUpdate = new Date(data.created_at.replace(/-/g, '/'));
+      const now = new Date();
+      const diffSec = Math.floor((now - lastUpdate) / 1000);
+      secondsSinceUpdate = diffSec >= 0 ? diffSec : 0;
+    } else {
+      secondsSinceUpdate++;
+    }
+    updateLastUpdated(secondsSinceUpdate);
+
+  } catch (err) {
+    console.error("Error fetching live data:", err);
+    // Jangan tampilkan data palsu — tampilkan status error
+    if (!sensorActive) setSensorOffline();
+  }
+}
+
+// ── Sensor belum aktif / offline ─────────────────────────────────────────────
+function setSensorOffline() {
+  const liveEl = document.getElementById('liveVal');
+  if (liveEl) liveEl.textContent = '--';
+  const badge = document.getElementById('qualityBadge');
+  if (badge) {
+    badge.className = 'quality-badge';
+    badge.style.cssText = 'background:rgba(107,127,163,0.12);color:#6b7fa3;border:1px solid rgba(107,127,163,0.25)';
+    badge.textContent = '⏳ Menunggu Sensor';
+  }
+  const lastUpd = document.getElementById('lastUpdated');
+  if (lastUpd) lastUpd.textContent = 'Sensor belum mengirim data';
+
+  // Status sensor card
+  const sensorEl = document.getElementById('status2SensorVal');
+  if (sensorEl) { sensorEl.textContent = 'OFFLINE'; sensorEl.className = 'status2-value sv-red'; }
+
+  // Status air card
+  setStatus2('--', 'sv-muted', false);
+
+  // Header pill
+  const pill = document.getElementById('statusPill');
+  if (pill) {
+    pill.className = 'status-pill';
+    pill.style.cssText = 'background:rgba(107,127,163,0.1);color:#6b7fa3;border:1px solid rgba(107,127,163,0.2);';
+    pill.innerHTML = '<div class="status-dot" style="background:#6b7fa3"></div>Sensor: Menunggu';
+  }
+}
+
+function setSensorOnline() {
+  // Kembalikan sensor card ke aktif
+  const sensorEl = document.getElementById('status2SensorVal');
+  if (sensorEl) { sensorEl.textContent = 'AKTIF'; sensorEl.className = 'status2-value sv-green'; }
+
+  // Header pill
+  const pill = document.getElementById('statusPill');
+  if (pill) {
+    pill.className = 'status-pill status-online';
+    pill.style.cssText = '';
+    pill.innerHTML = '<div class="status-dot"></div>Sistem: Online';
+  }
+}
+
+// Inisialisasi awal dan polling
+fetchHistory();
+fetchLiveData();
+setInterval(fetchLiveData, 2000);
+setInterval(fetchHistory, 15000);
+
+// Uptime
+setInterval(() => {
+  uptimeSeconds++;
+  const h = Math.floor(uptimeSeconds / 3600);
+  const m = Math.floor((uptimeSeconds % 3600) / 60);
+  const uptimeEl = document.getElementById('p-uptime');
+  if (uptimeEl) uptimeEl.textContent = `${h}h ${m}m`;
+}, 1000);
+
+// ─────────────────────────────────────────────
+//  CLOCK
+// ─────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const clockEl = document.getElementById('clockDisplay');
+  if (clockEl) {
+    clockEl.textContent = now.toLocaleDateString('id-ID', {weekday:'short', day:'numeric', month:'short'}) + ' · ' +
+      now.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  }
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// ─────────────────────────────────────────────
+//  CALIBRATION MODAL
+// ─────────────────────────────────────────────
+const steps = [
+  'Menginisialisasi protokol kalibrasi...',
+  'Menguras buffer sensor...',
+  'Membaca baseline referensi...',
+  'Menyesuaikan koefisien konduktivitas...',
+  'Memverifikasi akurasi pembacaan...',
+  '✓ Kalibrasi selesai!'
+];
+
+function startCalibration() {
+  const bar = document.getElementById('calBar');
+  const stepEl = document.getElementById('calStep');
+  const btn = document.getElementById('calBtn');
+  btn.disabled = true;
+  btn.textContent = 'Memproses...';
+
+  let pct = 0;
+  let si = 0;
+  const interval = setInterval(() => {
+    pct += 100 / 60;
+    bar.style.width = Math.min(pct, 100) + '%';
+    if (pct >= (si + 1) * (100/6)) {
+      stepEl.textContent = steps[si] || steps[steps.length - 1];
+      si++;
+    }
+    if (pct >= 100) {
+      clearInterval(interval);
+      stepEl.textContent = '✓ Kalibrasi selesai!';
+      stepEl.style.color = 'var(--safe)';
+      setTimeout(() => {
+        closeModal();
+        secondsSinceUpdate = 0;
+        if (typeof addNotification === 'function') {
+          addNotification('✅ Kalibrasi Sukses', 'Sensor TDS telah berhasil dikalibrasi ulang.', 'safe');
+        }
+      }, 1200);
+    }
+  }, 50);
+}
+
+function closeModal() {
+  const overlay = document.getElementById('calModal');
+  overlay.classList.remove('open');
+  const bar = document.getElementById('calBar');
+  const stepEl = document.getElementById('calStep');
+  const btn = document.getElementById('calBtn');
+  if (bar) bar.style.width = '0';
+  if (stepEl) {
+    stepEl.textContent = 'Menunggu konfirmasi...';
+    stepEl.style.color = '';
+  }
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'Mulai Kalibrasi';
+  }
+}
+
+// ─────────────────────────────────────────────
+//  NOTIFICATION PANEL
+// ─────────────────────────────────────────────
+function toggleNotifPanel() {
+  const p = document.getElementById('notifPanel');
+  if (p) p.classList.toggle('show');
+  const badge = document.getElementById('notifBadge');
+  if (badge) badge.style.display = 'none';
+}
+
+function addNotification(title, message, type) {
+  const list = document.getElementById('notifListDrop');
+  const empty = document.getElementById('notifEmpty');
+  if (empty) empty.style.display = 'none';
+  
+  const div = document.createElement('div');
+  div.className = `notif-item ${type}`;
+  div.innerHTML = `
+    <div style="font-weight:600;color:var(--text);">${title}</div>
+    <div style="color:var(--muted);font-size:11px;margin-top:4px;">${message}</div>
+    <div style="color:var(--muted);font-size:9px;margin-top:6px;text-align:right;">Baru saja</div>
+  `;
+  if (list) {
+    list.insertBefore(div, list.firstChild);
+  }
+  
+  const badge = document.getElementById('notifBadge');
+  const panel = document.getElementById('notifPanel');
+  if (badge && panel && !panel.classList.contains('show')) {
+    badge.style.display = 'block';
+  }
+}
+
+// ── STATUS2 HELPERS ──────────────────────────────────
+function setStatus2(label, colorClass, isDanger) {
+  const el = document.getElementById('status2AirVal');
+  const card = document.getElementById('cardStatusAir');
+  if (el) { 
+    el.textContent = label; 
+    el.className = 'status2-value ' + colorClass; 
+  }
+  if (card) {
+    card.style.borderColor = isDanger
+      ? 'rgba(255,107,107,0.4)'
+      : (colorClass === 'sv-yellow' ? 'rgba(255,209,102,0.4)' : 'rgba(0,255,157,0.3)');
+  }
+}
+
+// ── LOG AKTIVITAS ─────────────────────────────────────
+function appendLog(title, ppm, timeStr, isGood) {
+  const list = document.getElementById('logList');
+  if (!list) return;
+  // Hapus empty state jika masih ada
+  const empty = document.getElementById('logEmptyState');
+  if (empty) empty.remove();
+
+  const div = document.createElement('div');
+  div.className = 'log-item ' + (isGood ? 'log-safe' : 'log-danger');
+  div.innerHTML = `
+    <div class="log-icon">${isGood ? '✓' : '✗'}</div>
+    <div class="log-body">
+      <div class="log-title">${title}</div>
+      <div class="log-meta">${ppm} ppm &bull; ${timeStr}</div>
+    </div>
+  `;
+  list.insertBefore(div, list.firstChild);
+  while (list.children.length > 10) list.removeChild(list.lastChild);
+}
+
+async function loadActivities() {
+  try {
+    const res = await fetch('/api/get_activities');
+    const data = await res.json();
+    const list = document.getElementById('logList');
+    if (!list) return;
+    if (!data || data.length === 0) return; // Jaga empty state tetap tampil
+    list.innerHTML = '';
+    data.forEach(act => {
+      const isGood = act.status_class === 'ab-safe' || act.status_class === 'ab-success';
+      const div = document.createElement('div');
+      div.className = 'log-item ' + (isGood ? 'log-safe' : 'log-danger');
+      div.innerHTML = `
+        <div class="log-icon">${isGood ? '✓' : '✗'}</div>
+        <div class="log-body">
+          <div class="log-title">${act.name}</div>
+          <div class="log-meta">${act.value !== '—' ? act.value + ' ppm &bull; ' : ''}${act.time}</div>
+        </div>
+      `;
+      list.appendChild(div);
+    });
+  } catch(e) { console.error(e); }
+}
+loadActivities();
+
+// Close panel when clicking outside
+document.addEventListener('click', function(e) {
+  const p = document.getElementById('notifPanel');
+  if (p && p.classList.contains('show') && !e.target.closest('.header-right')) {
+    p.classList.remove('show');
+  }
+});
+
+// ─────────────────────────────────────────────
+//  EKSPOR PDF
+// ─────────────────────────────────────────────
+function exportReport() {
+  const btn = document.getElementById('exportBtn') || event.target;
+  const originalText = btn.textContent;
+  btn.textContent = '⟳ Memproses PDF...';
+  btn.disabled = true;
+
+  const element = document.querySelector('.wrapper');
+  const origBg = element.style.background;
+  const origBoxShadow = element.style.boxShadow;
+  element.style.background = '#0b0f1a'; 
+  element.style.boxShadow = 'none';
+
+  const actions = document.querySelector('.live-actions');
+  if(actions) actions.style.display = 'none';
+
+  const opt = {
+    margin:       0.3,
+    filename:     'Laporan-Kualitas-Air-HydroMetric.pdf',
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, logging: false },
+    jsPDF:        { unit: 'in', format: 'a3', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(element).save().then(() => {
+    element.style.background = origBg;
+    element.style.boxShadow = origBoxShadow;
+    if(actions) actions.style.display = 'flex';
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }).catch(err => {
+    console.error(err);
+    element.style.background = origBg;
+    element.style.boxShadow = origBoxShadow;
+    if(actions) actions.style.display = 'flex';
+    btn.textContent = originalText;
+    btn.disabled = false;
+  });
+}
+
+// Close modal on overlay click
+const modal = document.getElementById('calModal');
+if (modal) {
+  modal.addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+}
+
+
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</body>
+</html>
